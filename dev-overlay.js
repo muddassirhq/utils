@@ -1,5 +1,9 @@
-(function () {
+(function (script) {
   if (document.cookie.includes("peek_granted=true")) return;
+  if (document.getElementById("dev-overlay")) return;
+
+  const endpoint = script?.getAttribute("data-dev-overlay-endpoint") || "";
+  console.log("[DevOverlay] endpoint:", endpoint);
 
   function injectStyles() {
     const style = document.createElement("style");
@@ -28,8 +32,12 @@
         border-radius: 4px;
         border: none;
         width: 250px;
+        color: #fff; /* fix */
+        background: rgba(255, 255, 255, 0.1); /* optional nice look */
       }
-
+      #dev-overlay input::placeholder {
+        color: #ccc;
+      }
       #dev-overlay button {
         margin-top: 0.5rem;
         padding: 0.5rem 1rem;
@@ -41,6 +49,10 @@
         cursor: pointer;
       }
 
+      body.blurred {
+        overflow: hidden;
+      }
+
       body.blurred > *:not(#dev-overlay) {
         filter: blur(10px);
         pointer-events: none;
@@ -50,7 +62,8 @@
     document.head.appendChild(style);
   }
 
-  function showOverlay(endpoint) {
+  function showOverlay() {
+    if (!document.body) return; // Safety fallback
     document.body.classList.add("blurred");
 
     const overlay = document.createElement("div");
@@ -64,51 +77,41 @@
     document.body.appendChild(overlay);
 
     overlay.querySelector("#peek-btn").addEventListener("click", async () => {
-      const email = overlay.querySelector("#peek-email").value;
-      if (!email || !email.includes("@")) {
+      const email = overlay.querySelector("#peek-email").value.trim();
+      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
         alert("Please enter a valid email");
         return;
       }
 
       try {
         if (endpoint) {
-          await fetch(endpoint, {
+          const res = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email }),
           });
+          if (!res.ok) throw new Error(`Server responded with ${res.status}`);
         }
 
-        document.cookie = "peek_granted=true; path=/";
+        const oneYear = 60 * 60 * 24 * 365;
+        document.cookie = "peek_granted=true; path=/; max-age=" + oneYear;
+
         document.body.classList.remove("blurred");
         overlay.remove();
-        console.log("Email submitted:", email);
+        console.log("[DevOverlay] Email submitted:", email);
       } catch (err) {
         alert("Failed to submit email. Try again later.");
-        console.error(err);
+        console.error("[DevOverlay] Error:", err);
       }
     });
   }
 
   injectStyles();
 
-  // Look for `data-dev-overlay-endpoint` in the <script> tag
-  document.addEventListener("DOMContentLoaded", () => {
-    const currentScript = document.currentScript || [...document.scripts].pop();
-    const endpoint = currentScript.getAttribute("data-dev-overlay-endpoint") || "";
-    showOverlay(endpoint);
-  });
-})();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", showOverlay);
+  } else {
+    showOverlay();
+  }
 
-// Usage Guideline
-
-//<script 
-//  src="https://cdn.jsdelivr.net/gh/your-username/your-repo@latest/dev-overlay.js"
-//  data-dev-overlay-endpoint="https://formspree.io/f/abc123">
-//</script>
-
-//<script 
-//  src="https://cdn.jsdelivr.net/gh/your-username/your-repo@latest/dev-overlay.js"
-//  data-dev-overlay-endpoint="https://formbold.com/s/xyz456">
-//</script>
-
+})(document.currentScript);
