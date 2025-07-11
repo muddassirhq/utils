@@ -3,7 +3,7 @@
   if (document.getElementById("dev-overlay")) return;
 
   const endpoint = script?.getAttribute("data-dev-overlay-endpoint") || "";
-  // console.log("[DevOverlay] endpoint:", endpoint);
+  console.log("[DevOverlay] endpoint:", endpoint);
 
   function injectStyles() {
     const style = document.createElement("style");
@@ -25,7 +25,7 @@
         padding: 1rem;
       }
 
-      #dev-overlay input, #dev-overlay textarea {
+      #dev-overlay input {
         padding: 0.5rem;
         margin-top: 1rem;
         font-size: 1rem;
@@ -49,6 +49,11 @@
         border-radius: 4px;
         color: white;
         cursor: pointer;
+      }
+
+      #dev-overlay p.status {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
       }
 
       body.blurred {
@@ -78,28 +83,55 @@
         <input type="email" name="email" placeholder="you@example.com" required />
         <input type="hidden" name="message" value="Dev Overlay Access Request" />
         <button type="submit">Enter</button>
+        <p class="status"></p>
       </form>
     `;
+
     document.body.appendChild(overlay);
 
     const form = overlay.querySelector("#peek-form");
-    form.addEventListener("submit", (e) => {
-      const emailInput = form.querySelector('input[name="email"]');
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailInput.value.trim())) {
-        alert("Please enter a valid email");
-        e.preventDefault();
+    const status = form.querySelector(".status");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = form.querySelector('input[name="email"]').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        status.textContent = "Please enter a valid email address.";
         return;
       }
 
-      // Let the form submit normally, but also set cookie immediately
-      const oneYear = 60 * 60 * 24 * 365;
-      document.cookie = "peek_granted=true; path=/; max-age=" + oneYear;
+      const data = new FormData(form);
 
-      // Clean up overlay after short delay (optional)
-      setTimeout(() => {
-        document.body.classList.remove("blurred");
-        overlay.remove();
-      }, 500);
+      try {
+        const res = await fetch(endpoint, {
+          method: form.method,
+          body: data,
+          headers: { 'Accept': 'application/json' }
+        });
+
+        if (res.ok) {
+          status.textContent = "Thanks! Access granted.";
+          const oneYear = 60 * 60 * 24 * 365;
+          document.cookie = "peek_granted=true; path=/; max-age=" + oneYear;
+
+          setTimeout(() => {
+            document.body.classList.remove("blurred");
+            overlay.remove();
+          }, 500);
+
+        } else {
+          const result = await res.json();
+          if (result.errors) {
+            status.textContent = result.errors.map(e => e.message).join(", ");
+          } else {
+            status.textContent = "Oops! There was a problem.";
+          }
+        }
+      } catch (err) {
+        console.error("[DevOverlay] AJAX error:", err);
+        status.textContent = "Oops! There was a problem.";
+      }
     });
   }
 
