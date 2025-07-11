@@ -78,10 +78,11 @@
 
     overlay.querySelector("#peek-btn").addEventListener("click", async () => {
       const email = overlay.querySelector("#peek-email").value.trim();
-      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
-        alert("Please enter a valid email");
-        return;
-      }
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+  alert("Please enter a valid email");
+  return;
+}
+
 
       try {
         if (endpoint) {
