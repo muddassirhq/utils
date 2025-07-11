@@ -86,12 +86,13 @@ if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
 
       try {
         if (endpoint) {
-          const res = await fetch(endpoint, {
+        const formData = new FormData();
+        formData.append("email", email);
+
+          await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          });
-          if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+            body: formData
+            });
         }
 
         const oneYear = 60 * 60 * 24 * 365;
